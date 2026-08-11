@@ -1,0 +1,30 @@
+# Terraform
+**/.terraform/
+**/.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfvars
+terraform/terraform
+terraform.zip
+
+# Java & Maven
+**/target/
+*.class
+*.jar
+*.war
+
+# Node & Frontend
+**/node_modules/
+**/dist/
+**/build/
+.output/
+
+# IDE & OS Files
+.DS_Store
+.idea/
+*.iml
+.vscode/
+
+# Environment & Logs
+.env
+*.log
