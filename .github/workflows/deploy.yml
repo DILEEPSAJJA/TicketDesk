@@ -1,0 +1,100 @@
+name: TicketDesk CI/CD Deployment Pipeline
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  build-test-scan-deploy:
+    name: Build, Test, Security Scan & Deploy to AWS ECS Fargate
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout Repository
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      # Step 2: Set up JDK 17
+      - name: Set up Java 17 (JDK)
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      # Step 3: Run Backend Unit & Integration Tests
+      - name: Build & Run Unit Tests (Maven)
+        run: |
+          cd ticketdesk-backend
+          mvn clean test
+
+      # Step 4: Secret Scanning (Check for accidentally committed keys/passwords)
+      - name: Secret Security Scan (TruffleHog)
+        uses: trufflesecurity/trufflehog-actions-scan@v3.82.6
+        with:
+          path: ./
+          base: ${{ github.event.repository.default_branch }}
+          head: ${{ github.sha }}
+          extra_args: --debug --only-verified
+
+      # Step 5: Configure AWS Credentials
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION || 'us-east-1' }}
+
+      # Step 6: Log in to Amazon ECR
+      - name: Log in to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # Step 7: Build, Tag & Push Docker Image to ECR
+      - name: Build, Tag, and Push Docker Image to ECR
+        id: build-image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ticketdesk-backend
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          cd ticketdesk-backend
+          echo "Building Docker image for linux/amd64 with commit SHA tag: $IMAGE_TAG"
+          docker build --platform linux/amd64 -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -t $ECR_REGISTRY/$ECR_REPOSITORY:latest -f Dockerfile .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+      # Step 8: Deploy / Update ECS Fargate Service
+      - name: Deploy Task Definition to Amazon ECS Fargate Service
+        run: |
+          echo "Triggering force new deployment on ECS Service 'tkt-capstone-service'..."
+          aws ecs update-service \
+            --cluster tkt-capstone-cluster \
+            --service tkt-capstone-service \
+            --force-new-deployment \
+            --region us-east-1
+
+      # Step 9: Post-Deployment Smoke Test against Live ALB URL
+      - name: Post-Deployment Smoke Test
+        run: |
+          echo "Waiting 45 seconds for ECS tasks to initialize and register with Load Balancer..."
+          sleep 45
+          
+          ALB_URL="http://tkt-capstone-alb-2123581436.us-east-1.elb.amazonaws.com/actuator/health"
+          echo "Executing Smoke Test against: $ALB_URL"
+          
+          STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$ALB_URL")
+          if [ "$STATUS_CODE" -eq 200 ]; then
+            echo "SMOKE TEST PASSED: Application is live and healthy (HTTP 200 OK)"
+          else
+            echo "SMOKE TEST FAILED: Endpoint returned HTTP status code $STATUS_CODE"
+            exit 1
+          fi
