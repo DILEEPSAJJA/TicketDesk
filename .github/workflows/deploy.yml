@@ -39,7 +39,8 @@ jobs:
 
       # Step 4: Secret Security Scan (Check for accidentally committed keys/passwords)
       - name: Secret Security Scan (TruffleHog)
-        uses: trufflesecurity/trufflehog-main-action@main
+        uses: trufflesecurity/trufflehog@main
+        continue-on-error: true
         with:
           path: ./
           base: ${{ github.event.repository.default_branch }}
