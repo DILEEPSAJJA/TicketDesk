@@ -8,7 +8,7 @@ resource "aws_cloudwatch_log_group" "ecs" {
   }
 }
 
-# IAM Task Execution Role (Allows ECS agent to pull ECR images & write CloudWatch logs)
+# IAM Task Execution Role (Allows ECS agent to pull ECR images, write logs & fetch secrets)
 resource "aws_iam_role" "ecs_execution_role" {
   name = "${var.resource_prefix}-ecs-execution-role"
 
@@ -29,6 +29,29 @@ resource "aws_iam_role" "ecs_execution_role" {
 resource "aws_iam_role_policy_attachment" "ecs_execution_policy" {
   role       = aws_iam_role.ecs_execution_role.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+}
+
+# Inline Policy for Execution Role to fetch Secrets Manager & SSM Parameters
+resource "aws_iam_role_policy" "ecs_execution_secrets_policy" {
+  name = "${var.resource_prefix}-secrets-policy"
+  role = aws_iam_role.ecs_execution_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue",
+          "ssm:GetParameters"
+        ]
+        Resource = [
+          aws_secretsmanager_secret.db_credentials.arn,
+          aws_ssm_parameter.jwt_secret.arn
+        ]
+      }
+    ]
+  })
 }
 
 # IAM Task Role (Application container runtime permissions)
@@ -59,7 +82,7 @@ resource "aws_ecs_cluster" "main" {
   }
 }
 
-# ECS Fargate Task Definition
+# ECS Fargate Task Definition with Secrets & RDS Connection
 resource "aws_ecs_task_definition" "app" {
   family                   = "${var.resource_prefix}-task"
   network_mode             = "awsvpc"
@@ -80,6 +103,36 @@ resource "aws_ecs_task_definition" "app" {
           containerPort = var.container_port
           hostPort      = var.container_port
           protocol      = "tcp"
+        }
+      ]
+
+      environment = [
+        {
+          name  = "SPRING_PROFILES_ACTIVE"
+          value = "prod"
+        },
+        {
+          name  = "SPRING_DATASOURCE_URL"
+          value = "jdbc:mysql://${aws_db_instance.mysql.endpoint}/ticketdesk_db?useSSL=false&allowPublicKeyRetrieval=true"
+        },
+        {
+          name  = "SPRING_JPA_HIBERNATE_DDL_AUTO"
+          value = "update"
+        }
+      ]
+
+      secrets = [
+        {
+          name      = "SPRING_DATASOURCE_PASSWORD"
+          valueFrom = "${aws_secretsmanager_secret.db_credentials.arn}:password::"
+        },
+        {
+          name      = "SPRING_DATASOURCE_USERNAME"
+          valueFrom = "${aws_secretsmanager_secret.db_credentials.arn}:username::"
+        },
+        {
+          name      = "JWT_SECRET"
+          valueFrom = aws_ssm_parameter.jwt_secret.arn
         }
       ]
 
@@ -117,6 +170,8 @@ resource "aws_ecs_service" "main" {
 
   depends_on = [
     aws_lb_listener.front_end,
-    aws_iam_role_policy_attachment.ecs_execution_policy
+    aws_iam_role_policy_attachment.ecs_execution_policy,
+    aws_iam_role_policy.ecs_execution_secrets_policy,
+    aws_db_instance.mysql
   ]
 }

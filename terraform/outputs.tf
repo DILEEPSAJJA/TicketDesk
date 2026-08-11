@@ -32,3 +32,18 @@ output "cloudwatch_log_group" {
   value       = aws_cloudwatch_log_group.ecs.name
   description = "CloudWatch Log Group Name"
 }
+
+output "rds_endpoint" {
+  value       = aws_db_instance.mysql.endpoint
+  description = "Private RDS MySQL Endpoint"
+}
+
+output "secretsmanager_db_credentials_arn" {
+  value       = aws_secretsmanager_secret.db_credentials.arn
+  description = "AWS Secrets Manager Secret ARN for DB Credentials"
+}
+
+output "ssm_jwt_secret_arn" {
+  value       = aws_ssm_parameter.jwt_secret.arn
+  description = "AWS SSM Parameter Store ARN for JWT Secret"
+}
