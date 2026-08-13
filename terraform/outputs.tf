@@ -3,6 +3,11 @@ output "alb_dns_name" {
   description = "Public URL of the Application Load Balancer"
 }
 
+output "alb_hostname" {
+  value       = aws_lb.main.dns_name
+  description = "Hostname of Application Load Balancer"
+}
+
 output "vpc_id" {
   value       = aws_vpc.main.id
   description = "VPC Identifier"
@@ -46,4 +51,34 @@ output "secretsmanager_db_credentials_arn" {
 output "ssm_jwt_secret_arn" {
   value       = aws_ssm_parameter.jwt_secret.arn
   description = "AWS SSM Parameter Store ARN for JWT Secret"
+}
+
+output "s3_bucket_name" {
+  value       = aws_s3_bucket.frontend_bucket.bucket
+  description = "Frontend Static Website Hosting S3 Bucket Name"
+}
+
+output "s3_website_endpoint" {
+  value       = aws_s3_bucket_website_configuration.frontend.website_endpoint
+  description = "Frontend S3 Website Endpoint URL"
+}
+
+output "attachments_bucket_name" {
+  value       = aws_s3_bucket.attachments_bucket.bucket
+  description = "Attachments S3 Bucket Name"
+}
+
+output "lambda_function_name" {
+  value       = aws_lambda_function.thumbnail.function_name
+  description = "Thumbnail Generator Lambda Function Name"
+}
+
+output "cloudwatch_dashboard_name" {
+  value       = aws_cloudwatch_dashboard.main.dashboard_name
+  description = "Observability CloudWatch Dashboard Name"
+}
+
+output "sns_alerts_topic_arn" {
+  value       = aws_sns_topic.alerts.arn
+  description = "SNS Alert Notification Topic ARN"
 }

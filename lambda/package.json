@@ -1,0 +1,10 @@
+{
+  "name": "ticketdesk-thumbnail-lambda",
+  "version": "1.0.0",
+  "description": "AWS Lambda thumbnail generator for TicketDesk attachment uploads",
+  "main": "index.js",
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.500.0",
+    "jimp": "^0.22.12"
+  }
+}
