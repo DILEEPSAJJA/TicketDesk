@@ -1,8 +1,6 @@
 # Terraform
 **/.terraform/
 **/.terraform.lock.hcl
-*.tfstate
-*.tfstate.*
 *.tfvars
 terraform/terraform
 terraform.zip

@@ -26,9 +26,10 @@ resource "aws_secretsmanager_secret_version" "db_credentials" {
 
 # Systems Manager Parameter Store for JWT Secret
 resource "aws_ssm_parameter" "jwt_secret" {
-  name  = "/${var.resource_prefix}/JWT_SECRET"
-  type  = "SecureString"
-  value = "404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970" # Production 512-bit Secret
+  name      = "/${var.resource_prefix}/JWT_SECRET"
+  type      = "SecureString"
+  value     = "404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970"
+  overwrite = true
 
   tags = {
     Name = "${var.resource_prefix}-jwt-secret-param"

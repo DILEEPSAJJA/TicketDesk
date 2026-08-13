@@ -16,7 +16,7 @@ on:
           - destroy
 
 permissions:
-  contents: read
+  contents: write
 
 env:
   AWS_REGION: ${{ secrets.AWS_REGION || 'ap-south-2' }}
@@ -31,6 +31,7 @@ jobs:
       - name: Checkout Source Code
         uses: actions/checkout@v4
         with:
+          token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
       # 2. Secret scanning (M6 Requirement)
@@ -161,3 +162,13 @@ jobs:
           else
             echo "SMOKE TEST WARNING: Endpoint returned status code $STATUS_CODE"
           fi
+
+      # 15. Commit and save Terraform state file for CI/CD state persistence
+      - name: Commit State File
+        if: always()
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add terraform/terraform.tfstate || true
+          git commit -m "Update Terraform state after build [skip ci]" || true
+          git push || true
