@@ -150,6 +150,8 @@ jobs:
             terraform destroy -auto-approve
           else
             IMAGE_URI="${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}"
+            echo "Ensuring ECR repository is tracked in Terraform state..."
+            terraform import aws_ecr_repository.backend ticketdesk-backend >/dev/null 2>&1 || true
             echo "Applying Terraform with container_image=${IMAGE_URI}..."
             terraform apply -auto-approve -var="container_image=${IMAGE_URI}"
             
