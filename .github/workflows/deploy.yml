@@ -54,10 +54,14 @@ jobs:
         with:
           terraform_version: "1.7.5"
 
-      # 5. Clean Unused Manual Test VPCs to ensure VPC Quota availability
-      - name: Clean Unused Test VPCs
+      # 5. Clean Unused Manual Test VPCs & Release Unassociated Elastic IPs
+      - name: Clean Unused Test VPCs & Release EIPs
         run: |
-          echo "Checking VPC quota in region ${{ env.AWS_REGION }}..."
+          echo "Checking VPC quota and unassociated EIPs in region ${{ env.AWS_REGION }}..."
+          for alloc in $(aws ec2 describe-addresses --query "Addresses[?AssociationId==null].AllocationId" --output text 2>/dev/null); do
+            echo "Releasing unassociated EIP $alloc..."
+            aws ec2 release-address --allocation-id $alloc || true
+          done
           vpcs=$(aws ec2 describe-vpcs --filters "Name=isDefault,Values=false" "Name=tag:Name,Values=tkt-manual-vpc" --query "Vpcs[*].VpcId" --output text)
           for vpc in $vpcs; do
             echo "Deleting test VPC $vpc..."
