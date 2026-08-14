@@ -161,6 +161,7 @@ jobs:
             terraform import aws_iam_role.lambda_role tkt-capstone-lambda-role >/dev/null 2>&1 || true
             terraform import aws_db_subnet_group.main tkt-capstone-db-subnet-group >/dev/null 2>&1 || true
             terraform import aws_cloudwatch_log_group.ecs /ecs/tkt-capstone-task >/dev/null 2>&1 || true
+            terraform import aws_lambda_function.thumbnail tkt-capstone-thumbnail-generator >/dev/null 2>&1 || true
             alb_arn=$(aws elbv2 describe-load-balancers --names tkt-capstone-alb --query "LoadBalancers[0].LoadBalancerArn" --output text 2>/dev/null || true)
             if [ -n "$alb_arn" ] && [ "$alb_arn" != "None" ]; then terraform import aws_lb.main $alb_arn >/dev/null 2>&1 || true; fi
             tg_arn=$(aws elbv2 describe-target-groups --names tkt-capstone-tg --query "TargetGroups[0].TargetGroupArn" --output text 2>/dev/null || true)
