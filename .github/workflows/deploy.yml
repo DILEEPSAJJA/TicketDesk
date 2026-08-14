@@ -54,20 +54,37 @@ jobs:
         with:
           terraform_version: "1.7.5"
 
-      # 5. Install Node.js dependencies for Lambda thumbnail generator
+      # 5. Clean Unused Manual Test VPCs to ensure VPC Quota availability
+      - name: Clean Unused Test VPCs
+        run: |
+          echo "Checking VPC quota in region ${{ env.AWS_REGION }}..."
+          vpcs=$(aws ec2 describe-vpcs --filters "Name=isDefault,Values=false" "Name=tag:Name,Values=tkt-manual-vpc" --query "Vpcs[*].VpcId" --output text)
+          for vpc in $vpcs; do
+            echo "Deleting test VPC $vpc..."
+            subnets=$(aws ec2 describe-subnets --filters "Name=vpc-id,Values=$vpc" --query "Subnets[*].SubnetId" --output text)
+            for sub in $subnets; do aws ec2 delete-subnet --subnet-id $sub || true; done
+            igws=$(aws ec2 describe-internet-gateways --filters "Name=attachment.vpc-id,Values=$vpc" --query "InternetGateways[*].InternetGatewayId" --output text)
+            for igw in $igws; do
+              aws ec2 detach-internet-gateway --internet-gateway-id $igw --vpc-id $vpc || true
+              aws ec2 delete-internet-gateway --internet-gateway-id $igw || true
+            done
+            aws ec2 delete-vpc --vpc-id $vpc || true
+          done
+
+      # 6. Install Node.js dependencies for Lambda thumbnail generator
       - name: Install Lambda Dependencies
         run: |
           cd lambda
           npm install || true
 
-      # 6. Initialize Terraform
+      # 7. Initialize Terraform
       - name: Terraform Init
         id: tf_setup
         run: |
           cd terraform
           terraform init
 
-      # 7. Ensure ECR Repositories Exist before Docker Push
+      # 8. Ensure ECR Repositories Exist before Docker Push
       - name: Ensure ECR Repositories Exist
         if: ${{ github.event_name == 'push' || github.event.inputs.terraform_action != 'destroy' }}
         run: |
@@ -75,7 +92,7 @@ jobs:
           aws ecr describe-repositories --repository-names ticketdesk-backend --region ${{ env.AWS_REGION }} >/dev/null 2>&1 || \
           aws ecr create-repository --repository-name ticketdesk-backend --region ${{ env.AWS_REGION }} --image-scanning-configuration scanOnPush=true
 
-      # 8. Compile & Package Spring Boot Backend Jar
+      # 9. Compile & Package Spring Boot Backend Jar
       - name: Set up Java 17 (JDK)
         if: ${{ github.event_name == 'push' || github.event.inputs.terraform_action != 'destroy' }}
         uses: actions/setup-java@v4
@@ -90,18 +107,18 @@ jobs:
           cd ticketdesk-backend
           mvn clean package -DskipTests
 
-      # 9. Log in to Amazon ECR
+      # 10. Log in to Amazon ECR
       - name: Log in to Amazon ECR
         if: ${{ github.event_name == 'push' || github.event.inputs.terraform_action != 'destroy' }}
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      # 10. Get Commit SHA Tag
+      # 11. Get Commit SHA Tag
       - name: Get Commit SHA
         id: vars
         run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
-      # 11. Build & Push Backend Docker Image to ECR
+      # 12. Build & Push Backend Docker Image to ECR
       - name: Build and Push Docker Image
         if: ${{ github.event_name == 'push' || github.event.inputs.terraform_action != 'destroy' }}
         env:
@@ -115,7 +132,7 @@ jobs:
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
 
-      # 12. Execute Terraform Action (Apply or Destroy)
+      # 13. Execute Terraform Action (Apply or Destroy)
       - name: Run Terraform Action
         id: tf_run
         env:
@@ -142,7 +159,7 @@ jobs:
             echo "alb_host=$(terraform output -raw alb_hostname)" >> $GITHUB_OUTPUT
           fi
 
-      # 13. Build & Upload Frontend to S3 Bucket (M4 Servicing)
+      # 14. Build & Upload Frontend to S3 Bucket (M4 Servicing)
       - name: Build & Sync React Frontend UI to S3
         if: ${{ success() && (github.event_name == 'push' || github.event.inputs.terraform_action != 'destroy') }}
         run: |
@@ -152,7 +169,7 @@ jobs:
           npm run build
           aws s3 sync dist/ s3://${{ steps.tf_run.outputs.s3_bucket }} --delete
 
-      # 14. Run Post-Deployment Smoke Test (M6 Requirement)
+      # 15. Run Post-Deployment Smoke Test (M6 Requirement)
       - name: Run ALB Backend Smoke Test
         if: ${{ success() && (github.event_name == 'push' || github.event.inputs.terraform_action != 'destroy') }}
         run: |
@@ -169,7 +186,7 @@ jobs:
             echo "SMOKE TEST WARNING: Endpoint returned status code $STATUS_CODE"
           fi
 
-      # 15. Commit and save Terraform state file for CI/CD state persistence
+      # 16. Commit and save Terraform state file for CI/CD state persistence
       - name: Commit State File
         if: always()
         run: |
