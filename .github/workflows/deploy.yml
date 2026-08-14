@@ -19,7 +19,7 @@ permissions:
   contents: write
 
 env:
-  AWS_REGION: ${{ secrets.AWS_REGION || 'ap-south-2' }}
+  AWS_REGION: ${{ secrets.AWS_REGION || 'us-east-1' }}
 
 jobs:
   build-push-deploy:
@@ -118,6 +118,10 @@ jobs:
       # 12. Execute Terraform Action (Apply or Destroy)
       - name: Run Terraform Action
         id: tf_run
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ticketdesk-backend
+          IMAGE_TAG: ${{ steps.vars.outputs.sha_short }}
         run: |
           cd terraform
           ACTION="${{ github.event.inputs.terraform_action }}"
@@ -128,7 +132,9 @@ jobs:
           if [ "$ACTION" == "destroy" ]; then
             terraform destroy -auto-approve
           else
-            terraform apply -auto-approve
+            IMAGE_URI="${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}"
+            echo "Applying Terraform with container_image=${IMAGE_URI}..."
+            terraform apply -auto-approve -var="container_image=${IMAGE_URI}"
             
             # Export outputs for frontend sync
             echo "s3_bucket=$(terraform output -raw s3_bucket_name)" >> $GITHUB_OUTPUT

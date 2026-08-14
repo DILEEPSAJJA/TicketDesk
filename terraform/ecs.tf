@@ -1,14 +1,14 @@
-# CloudWatch Log Group for ECS Application Logs
+# CloudWatch Log Group for ECS Task logs
 resource "aws_cloudwatch_log_group" "ecs" {
   name              = "/ecs/${var.resource_prefix}-task"
-  retention_in_days = 14
+  retention_in_days = 30
 
   tags = {
-    Name = "${var.resource_prefix}-log-group"
+    Name = "${var.resource_prefix}-ecs-log-group"
   }
 }
 
-# IAM Task Execution Role (Allows ECS agent to pull ECR images, write logs & fetch secrets)
+# ECS Task Execution Role (Allows Fargate to pull ECR images and fetch Secrets Manager/SSM secrets)
 resource "aws_iam_role" "ecs_execution_role" {
   name = "${var.resource_prefix}-ecs-execution-role"
 
@@ -31,7 +31,7 @@ resource "aws_iam_role_policy_attachment" "ecs_execution_policy" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
-# Inline Policy for Execution Role to fetch Secrets Manager & SSM Parameters
+# Inline policy to read Secrets Manager & SSM Parameter Store
 resource "aws_iam_role_policy" "ecs_execution_secrets_policy" {
   name = "${var.resource_prefix}-secrets-policy"
   role = aws_iam_role.ecs_execution_role.id
@@ -54,7 +54,7 @@ resource "aws_iam_role_policy" "ecs_execution_secrets_policy" {
   })
 }
 
-# IAM Task Role (Application container runtime permissions)
+# ECS Task Role (Application runtime permissions)
 resource "aws_iam_role" "ecs_task_role" {
   name = "${var.resource_prefix}-ecs-task-role"
 
@@ -95,7 +95,7 @@ resource "aws_ecs_task_definition" "app" {
   container_definitions = jsonencode([
     {
       name      = "ticketdesk-app"
-      image     = var.container_image
+      image     = var.container_image != "" && var.container_image != "public.ecr.aws/docker/library/alpine:latest" ? var.container_image : "${aws_ecr_repository.backend.repository_url}:latest"
       essential = true
 
       portMappings = [

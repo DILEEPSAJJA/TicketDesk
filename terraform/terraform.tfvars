@@ -1,0 +1,8 @@
+aws_region          = "us-east-1"
+environment         = "dev"
+resource_prefix     = "tkt-capstone"
+container_image     = "088668668282.dkr.ecr.us-east-1.amazonaws.com/ticketdesk-backend:latest"
+container_port      = 8080
+app_count           = 2
+fargate_cpu         = "256"
+fargate_memory      = "512"
