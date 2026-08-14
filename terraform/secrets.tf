@@ -5,9 +5,9 @@ resource "random_password" "db_password" {
   override_special = "!#$%&*()-_=+[]{}<>:?"
 }
 
-# AWS Secrets Manager Secret for DB Credentials
+# AWS Secrets Manager Secret for DB Credentials (uses name_prefix to avoid name collision)
 resource "aws_secretsmanager_secret" "db_credentials" {
-  name                    = "${var.resource_prefix}-db-secret-v2"
+  name_prefix             = "${var.resource_prefix}-db-secret-"
   recovery_window_in_days = 0
 
   tags = {
