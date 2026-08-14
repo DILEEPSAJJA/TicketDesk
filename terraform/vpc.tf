@@ -1,4 +1,4 @@
-# Main VPC
+# Main Virtual Private Cloud (VPC)
 resource "aws_vpc" "main" {
   cidr_block           = var.vpc_cidr
   enable_dns_hostnames = true
@@ -9,7 +9,7 @@ resource "aws_vpc" "main" {
   }
 }
 
-# Internet Gateway for Public Subnets
+# Internet Gateway for Public Internet Access
 resource "aws_internet_gateway" "igw" {
   vpc_id = aws_vpc.main.id
 
@@ -18,7 +18,7 @@ resource "aws_internet_gateway" "igw" {
   }
 }
 
-# Public Subnets across 2 Availability Zones
+# 2 Public Subnets across 2 Availability Zones
 resource "aws_subnet" "public" {
   count                   = length(var.public_subnet_cidrs)
   vpc_id                  = aws_vpc.main.id
@@ -27,22 +27,19 @@ resource "aws_subnet" "public" {
   map_public_ip_on_launch = true
 
   tags = {
-    Name = "${var.resource_prefix}-pub-sub-${count.index + 1}"
-    Tier = "Public"
+    Name = "${var.resource_prefix}-public-subnet-${count.index + 1}"
   }
 }
 
-# Private Subnets across 2 Availability Zones
+# 2 Private Subnets across 2 Availability Zones for ECS & RDS
 resource "aws_subnet" "private" {
-  count                   = length(var.private_subnet_cidrs)
-  vpc_id                  = aws_vpc.main.id
-  cidr_block              = var.private_subnet_cidrs[count.index]
-  availability_zone       = var.availability_zones[count.index]
-  map_public_ip_on_launch = false
+  count             = length(var.private_subnet_cidrs)
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = var.private_subnet_cidrs[count.index]
+  availability_zone = var.availability_zones[count.index]
 
   tags = {
-    Name = "${var.resource_prefix}-priv-sub-${count.index + 1}"
-    Tier = "Private"
+    Name = "${var.resource_prefix}-private-subnet-${count.index + 1}"
   }
 }
 
@@ -56,7 +53,7 @@ resource "aws_eip" "nat" {
   }
 }
 
-# NAT Gateway in Public Subnet 1 (Enables outbound internet for private ECS tasks)
+# NAT Gateway in Public Subnet 1 (Enables private subnet outbound traffic)
 resource "aws_nat_gateway" "nat" {
   allocation_id = aws_eip.nat.id
   subnet_id     = aws_subnet.public[0].id
@@ -67,7 +64,7 @@ resource "aws_nat_gateway" "nat" {
   }
 }
 
-# Public Route Table (0.0.0.0/0 -> IGW)
+# Public Route Table (0.0.0.0/0 -> Internet Gateway)
 resource "aws_route_table" "public" {
   vpc_id = aws_vpc.main.id
 
@@ -97,14 +94,14 @@ resource "aws_route_table" "private" {
 
 # Associate Public Subnets with Public Route Table
 resource "aws_route_table_association" "public" {
-  count          = length(aws_subnet.public)
+  count          = length(var.public_subnet_cidrs)
   subnet_id      = aws_subnet.public[count.index].id
   route_table_id = aws_route_table.public.id
 }
 
 # Associate Private Subnets with Private Route Table
 resource "aws_route_table_association" "private" {
-  count          = length(aws_subnet.private)
+  count          = length(var.private_subnet_cidrs)
   subnet_id      = aws_subnet.private[count.index].id
   route_table_id = aws_route_table.private.id
 }

@@ -26,11 +26,11 @@ resource "aws_lb_target_group" "app" {
     path                = "/actuator/health"
     protocol            = "HTTP"
     port                = "traffic-port"
-    matcher             = "200"
-    interval            = 30
-    timeout             = 5
-    healthy_threshold   = 3
-    unhealthy_threshold = 3
+    matcher             = "200,201,302"
+    interval            = 15
+    timeout             = 10
+    healthy_threshold   = 2
+    unhealthy_threshold = 5
   }
 
   tags = {

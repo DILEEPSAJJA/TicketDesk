@@ -118,6 +118,10 @@ resource "aws_ecs_task_definition" "app" {
         {
           name  = "SPRING_JPA_HIBERNATE_DDL_AUTO"
           value = "update"
+        },
+        {
+          name  = "SPRING_JPA_DATABASE_PLATFORM"
+          value = "org.hibernate.dialect.MySQLDialect"
         }
       ]
 
@@ -150,11 +154,12 @@ resource "aws_ecs_task_definition" "app" {
 
 # ECS Fargate Service (Deploys tasks to Private Subnets behind Load Balancer)
 resource "aws_ecs_service" "main" {
-  name            = "${var.resource_prefix}-service"
-  cluster         = aws_ecs_cluster.main.id
-  task_definition = aws_ecs_task_definition.app.arn
-  desired_count   = var.app_count
-  launch_type     = "FARGATE"
+  name                            = "${var.resource_prefix}-service"
+  cluster                         = aws_ecs_cluster.main.id
+  task_definition                 = aws_ecs_task_definition.app.arn
+  desired_count                   = var.app_count
+  launch_type                     = "FARGATE"
+  health_check_grace_period_seconds = 120
 
   network_configuration {
     security_groups  = [aws_security_group.ecs_tasks.id]

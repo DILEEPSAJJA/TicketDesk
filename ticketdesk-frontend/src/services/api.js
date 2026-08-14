@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://tkt-capstone-alb-2097883117.us-east-1.elb.amazonaws.com/api',
   headers: {
     'Content-Type': 'application/json',
   },
