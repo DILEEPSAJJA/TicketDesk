@@ -154,8 +154,18 @@ jobs:
             terraform destroy -auto-approve
           else
             IMAGE_URI="${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}"
-            echo "Ensuring ECR repository is tracked in Terraform state..."
+            echo "Auto-importing pre-existing AWS resources into Terraform state..."
             terraform import aws_ecr_repository.backend ticketdesk-backend >/dev/null 2>&1 || true
+            terraform import aws_iam_role.ecs_execution_role tkt-capstone-ecs-execution-role >/dev/null 2>&1 || true
+            terraform import aws_iam_role.ecs_task_role tkt-capstone-ecs-task-role >/dev/null 2>&1 || true
+            terraform import aws_iam_role.lambda_role tkt-capstone-lambda-role >/dev/null 2>&1 || true
+            terraform import aws_db_subnet_group.main tkt-capstone-db-subnet-group >/dev/null 2>&1 || true
+            terraform import aws_cloudwatch_log_group.ecs /ecs/tkt-capstone-task >/dev/null 2>&1 || true
+            alb_arn=$(aws elbv2 describe-load-balancers --names tkt-capstone-alb --query "LoadBalancers[0].LoadBalancerArn" --output text 2>/dev/null || true)
+            if [ -n "$alb_arn" ] && [ "$alb_arn" != "None" ]; then terraform import aws_lb.main $alb_arn >/dev/null 2>&1 || true; fi
+            tg_arn=$(aws elbv2 describe-target-groups --names tkt-capstone-tg --query "TargetGroups[0].TargetGroupArn" --output text 2>/dev/null || true)
+            if [ -n "$tg_arn" ] && [ "$tg_arn" != "None" ]; then terraform import aws_lb_target_group.app $tg_arn >/dev/null 2>&1 || true; fi
+
             echo "Applying Terraform with container_image=${IMAGE_URI}..."
             terraform apply -auto-approve -var="container_image=${IMAGE_URI}"
             
